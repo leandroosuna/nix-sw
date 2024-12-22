@@ -42,8 +42,10 @@ struct Fingers
     Point b;
 };
 
-
-
+struct Distance 
+{
+    int x, y;
+};
 
 class TouchHandler {
 private:

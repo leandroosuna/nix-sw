@@ -40,7 +40,19 @@ bool isValidTouch(Point a)
 {
     return a.x != UINT16_MAX && a.y != UINT16_MAX;
 }
+Distance distance(Fingers current, Fingers last)
+{
+    Distance dis; 
+    dis.x = abs(current.a.x - current.b.x) - abs(last.a.x - last.b.x);
+    dis.y = abs(current.a.y - current.b.y) - abs(last.a.y - last.b.y);
+    return dis;
+} 
 
+bool distanceLargerThanLast(Fingers current, Fingers last)
+{
+    Distance dis = distance(current, last);
+    return dis.x >= 0 && dis.y >= 0;
+}
 bool distanceGreaterThan(Point a, Point b, uint16_t distance)
 {
     return (abs(a.x - b.x) > distance || abs(a.y - b.y) > distance);
@@ -80,19 +92,28 @@ void TouchHandler::calculateGesture()
             {
                 if(!isValidTouch(touchCurrent.b))
                 {
+                    gesture.start = touchCurrent.a;
                     switchState(State::FINGER_DOWN);
                 }
                 else
                 {
+                    gesture.start.x = 0;
+                    gesture.start.y = 0;
                     switchState(State::TWO_FINGER_DOWN);
                 }
-                gesture.start = touchCurrent.a;
                 
             }
             break;
         case State::FINGER_DOWN: //if finger is down check if it is a tap, slide or hold
             if(isValidTouch(touchCurrent.a))
             {
+                if(isValidTouch(touchCurrent.b)) //check for 2 fingers
+                {
+                    gesture.start.x = 0;
+                    gesture.start.y = 0;
+                    switchState(State::TWO_FINGER_DOWN);
+                    break;   
+                }
                 if(isValidTouch(touchLast.a))
                 {
                     if(distanceGreaterThan(touchCurrent.a, touchLast.a, MIN_DISTANCE_SLIDE))
@@ -142,11 +163,70 @@ void TouchHandler::calculateGesture()
             }
             break;
         case State::TWO_FINGER_DOWN:
-            switchState(State::START);
+            if(isValidTouch(touchCurrent.a) && isValidTouch(touchCurrent.b) && 
+            isValidTouch(touchLast.a) && isValidTouch(touchLast.b))
+            {
+                Distance dis = distance(touchCurrent, touchLast);
+                gesture.start.x += abs(dis.x);
+                gesture.start.y += abs(dis.y);
+                 
+                if(dis.x >= 0 && dis.y >=0)
+                {
+                    switchGestureType(GestureType::EXPAND);
+                    switchState(State::EXPANDING);
+                }
+                else
+                {
+                    switchGestureType(GestureType::PINCH);
+                    switchState(State::PINCHING);
+                }
+            }
             break;
         case State::EXPANDING:
+            if(isValidTouch(touchCurrent.a) && isValidTouch(touchCurrent.b) && 
+            isValidTouch(touchLast.a) && isValidTouch(touchLast.b))
+            {
+                Distance dis = distance(touchCurrent, touchLast);
+                if(dis.x >= 0 && dis.y >=0)
+                {   
+                    gesture.start.x += abs(dis.x);
+                    gesture.start.y += abs(dis.y);
+                }
+                else
+                {
+                    switchGestureType(GestureType::EXPAND);
+                    switchState(State::START);
+                }
+            }
+            else
+            {
+                switchGestureType(GestureType::EXPAND);
+                switchState(State::START);
+            }
+
             break;
         case State::PINCHING:
+
+            if(isValidTouch(touchCurrent.a) && isValidTouch(touchCurrent.b) && 
+            isValidTouch(touchLast.a) && isValidTouch(touchLast.b))
+            {
+                Distance dis = distance(touchCurrent, touchLast);
+                if(dis.x < 0 && dis.y < 0)
+                {   
+                    gesture.start.x += abs(dis.x);
+                    gesture.start.y += abs(dis.y);
+                }
+                else
+                {
+                    switchGestureType(GestureType::PINCH);
+                    switchState(State::START);
+                }
+            }
+            else
+            {
+                switchGestureType(GestureType::PINCH);
+                switchState(State::START);
+            }
             break;
     }
     
